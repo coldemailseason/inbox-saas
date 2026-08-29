@@ -1,0 +1,26 @@
+{
+  "name": "@inbox-saas/auth",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@inbox-saas/db": "workspace:*",
+    "@inbox-saas/env": "workspace:*",
+    "@polar-sh/better-auth": "catalog:",
+    "@polar-sh/sdk": "^0.47.0",
+    "better-auth": "catalog:",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@inbox-saas/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}
