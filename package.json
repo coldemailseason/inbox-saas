@@ -12,18 +12,20 @@
     "check-types": "turbo run check-types",
     "dev:web": "turbo run dev -F web --",
     "dev:server": "turbo run dev -F server --",
-    "db:push": "turbo run db:push -F @inbox-saas/db --",
     "db:studio": "turbo run db:studio -F @inbox-saas/db --",
     "db:generate": "turbo run db:generate -F @inbox-saas/db --",
     "db:migrate": "turbo run db:migrate -F @inbox-saas/db --",
-    "db:start": "docker compose up -d postgres",
-    "db:watch": "docker compose up postgres",
-    "db:stop": "docker compose stop postgres",
-    "db:down": "docker compose down postgres",
-    "docker:build": "docker compose build",
-    "docker:up": "docker compose up -d --build",
-    "docker:down": "docker compose down",
-    "docker:logs": "docker compose logs -f",
+    "db:start": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres",
+    "db:watch": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up postgres",
+    "db:stop": "docker compose -f docker-compose.yml -f docker-compose.dev.yml stop postgres",
+    "db:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml rm -sf postgres",
+    "test": "turbo run test",
+    "test:unit": "turbo run test:unit",
+    "test:integration": "turbo run test:integration",
+    "docker:build": "docker compose -f docker-compose.yml -f docker-compose.dev.yml build",
+    "docker:up": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build",
+    "docker:down": "docker compose -f docker-compose.yml -f docker-compose.dev.yml down",
+    "docker:logs": "docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f",
     "check": "oxlint && oxfmt --write"
   },
   "dependencies": {
@@ -38,7 +40,8 @@
     "oxfmt": "^0.63.0",
     "oxlint": "^1.78.0",
     "turbo": "^2.10.7",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "packageManager": "pnpm@11.5.2"
 }

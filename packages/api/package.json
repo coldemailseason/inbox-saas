@@ -9,21 +9,26 @@
       "default": "./src/*.ts"
     }
   },
-  "scripts": {},
+  "scripts": {
+    "test:integration": "vitest run test/integration"
+  },
   "dependencies": {
     "@inbox-saas/auth": "workspace:*",
     "@inbox-saas/db": "workspace:*",
     "@inbox-saas/env": "workspace:*",
+    "@inbox-saas/product": "workspace:*",
     "@orpc/client": "catalog:",
     "@orpc/openapi": "catalog:",
     "@orpc/server": "catalog:",
     "@orpc/zod": "catalog:",
     "dotenv": "catalog:",
+    "drizzle-orm": "^0.45.2",
+    "hono": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@inbox-saas/config": "workspace:*",
-    "hono": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

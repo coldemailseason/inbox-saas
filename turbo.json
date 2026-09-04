@@ -13,21 +13,25 @@
     "check-types": {
       "dependsOn": ["^check-types"]
     },
+    "test": {
+      "cache": false
+    },
+    "test:unit": {
+      "cache": false
+    },
+    "test:integration": {
+      "cache": false,
+      "env": ["TEST_DATABASE_URL"]
+    },
     "dev": {
       "cache": false,
       "persistent": true
     },
-    "db:push": {
-      "cache": false,
-      "interactive": true
-    },
     "db:generate": {
-      "cache": false,
-      "interactive": true
+      "cache": false
     },
     "db:migrate": {
-      "cache": false,
-      "interactive": true
+      "cache": false
     },
     "db:studio": {
       "cache": false,

@@ -7,7 +7,8 @@
     "check-types": "tsc -b",
     "compile": "bun build --compile --minify --sourcemap --bytecode ./src/index.ts --outfile server",
     "dev": "tsx watch src/index.ts",
-    "start": "node dist/index.mjs"
+    "start": "node dist/index.mjs",
+    "test:integration": "vitest run test/integration"
   },
   "dependencies": {
     "@hono/node-server": "^2.0.12",
@@ -26,9 +27,12 @@
   },
   "devDependencies": {
     "@inbox-saas/config": "workspace:*",
+    "@inbox-saas/product": "workspace:*",
     "@types/node": "catalog:",
+    "drizzle-orm": "^0.45.2",
     "tsdown": "^0.22.14",
     "tsx": "^4.23.1",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

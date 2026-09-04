@@ -10,6 +10,8 @@ build
 
 # Generated files
 apps/web/src/routeTree.gen.ts
+legacy-reference/
+customer_data/
 local.db
 local.db-*
 
@@ -50,6 +52,10 @@ lerna-debug.log*
 # Testing
 coverage
 .nyc_output
+
+# Python
+__pycache__/
+*.py[cod]
 
 # Misc
 *.tgz

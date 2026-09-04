@@ -1,0 +1,57 @@
+services:
+  web:
+    ports:
+      - "3002:80"
+
+  server:
+    env_file:
+      - apps/server/.env
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/inbox-saas
+      BETTER_AUTH_URL: http://localhost:3002
+      POLAR_SUCCESS_URL: http://localhost:3002/success?checkout_id={CHECKOUT_ID}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  migrate:
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/inbox-saas
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    env_file:
+      - apps/worker/.env
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/inbox-saas
+      PROVISIONER_BASE_URL: http://provisioner:8000
+
+  provisioner:
+    env_file:
+      - apps/worker/.env
+    environment:
+      INBOX_PROVISIONER_HEADLESS_BROWSER: "true"
+
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: inbox-saas
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - inbox-saas_postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d inbox-saas"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  inbox-saas_postgres_data:

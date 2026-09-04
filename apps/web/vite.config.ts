@@ -6,6 +6,12 @@ import { defineConfig } from "vite";
 export default defineConfig({
   server: {
     port: 3001,
+    strictPort: true,
+    proxy: {
+      "/api/auth": "http://localhost:3000",
+      "/rpc": "http://localhost:3000",
+      "/api-reference": "http://localhost:3000",
+    },
   },
   resolve: {
     tsconfigPaths: true,

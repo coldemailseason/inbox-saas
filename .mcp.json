@@ -14,7 +14,7 @@
     },
     "better-auth": {
       "type": "http",
-      "url": "https://mcp.inkeep.com/better-auth/mcp"
+      "url": "https://mcp.better-auth.com/mcp"
     },
     "polar": {
       "type": "http",

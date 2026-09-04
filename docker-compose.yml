@@ -5,14 +5,7 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
-      args:
-        VITE_SERVER_URL: http://localhost:3000
     init: true
-    ports:
-      - "3001:80"
-    env_file:
-      - path: apps/web/.env
-        required: false
     depends_on:
       server:
         condition: service_healthy
@@ -24,53 +17,78 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+      target: builder
+    working_dir: /app/packages/db
+    command: pnpm db:migrate:deploy
+    restart: "no"
+
   server:
     build:
       context: .
       dockerfile: apps/server/Dockerfile
     init: true
-    ports:
-      - "3000:3000"
-    env_file:
-      - path: apps/server/.env
-        required: false
-    environment:
-      CORS_ORIGIN: http://localhost:3001
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-password}@postgres:5432/inbox-saas
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test:
         [
           "CMD",
           "node",
           "-e",
-          "fetch('http://localhost:3000/').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+          "fetch('http://127.0.0.1:3000/').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
         ]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
-    depends_on:
-      postgres:
-        condition: service_healthy
     restart: unless-stopped
 
-  postgres:
-    image: postgres:18
-    container_name: inbox-saas-postgres
-    environment:
-      POSTGRES_DB: inbox-saas
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
-    ports:
-      - "5432:5432"
-    volumes:
-      - inbox-saas_postgres_data:/var/lib/postgresql
+  provisioner:
+    build:
+      context: .
+      dockerfile: apps/provisioner/Dockerfile
+    init: true
+    expose:
+      - "8000"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz').close()",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
     restart: unless-stopped
+    networks:
+      - provisioner_private
+      - provisioner_egress
 
-volumes:
-  inbox-saas_postgres_data:
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    init: true
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      provisioner:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - default
+      - provisioner_private
+
+networks:
+  provisioner_private:
+    internal: true
+  provisioner_egress:
+    internal: false

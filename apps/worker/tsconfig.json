@@ -1,0 +1,8 @@
+{
+  "extends": "@inbox-saas/config/tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "dist"
+  },
+  "include": ["src"]
+}

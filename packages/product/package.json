@@ -1,0 +1,29 @@
+{
+  "name": "@inbox-saas/product",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "test": "vitest run test/unit",
+    "test:unit": "vitest run test/unit",
+    "test:integration": "vitest run test/integration"
+  },
+  "dependencies": {
+    "@inbox-saas/db": "workspace:*",
+    "@inbox-saas/provisioner-contract": "workspace:*",
+    "drizzle-orm": "^0.45.2"
+  },
+  "devDependencies": {
+    "@inbox-saas/config": "workspace:*",
+    "dotenv": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

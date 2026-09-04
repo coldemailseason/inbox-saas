@@ -5,8 +5,6 @@ WORKDIR /app
 COPY . .
 RUN --mount=type=cache,target=/pnpm-store pnpm install --store-dir /pnpm-store
 
-ARG VITE_SERVER_URL
-ENV VITE_SERVER_URL=${VITE_SERVER_URL}
 ENV NODE_ENV=production
 RUN cd apps/web && pnpm run build
 

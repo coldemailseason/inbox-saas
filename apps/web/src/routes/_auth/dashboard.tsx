@@ -12,7 +12,7 @@ export const Route = createFileRoute("/_auth/dashboard")({
 function RouteComponent() {
   const { session, customerState } = Route.useRouteContext();
 
-  const privateData = useQuery(orpc.privateData.queryOptions());
+  const controlPlane = useQuery(orpc.controlPlane.queryOptions());
 
   const hasProSubscription = (customerState?.activeSubscriptions?.length ?? 0) > 0;
 
@@ -20,7 +20,19 @@ function RouteComponent() {
     <div>
       <h1>Dashboard</h1>
       <p>Welcome {session.data?.user.name}</p>
-      <p>API: {privateData.data?.message}</p>
+      <p>
+        Organizations:{" "}
+        {controlPlane.data
+          ? controlPlane.data.organizations.map((organization) => organization.name).join(", ") ||
+            "None"
+          : ""}
+      </p>
+      <p>
+        Workspaces:{" "}
+        {controlPlane.data
+          ? controlPlane.data.workspaces.map((workspace) => workspace.name).join(", ") || "None"
+          : ""}
+      </p>
       <p>Plan: {hasProSubscription ? "Pro" : "Free"}</p>
       {hasProSubscription ? (
         <Button onClick={async () => await authClient.customer.portal()}>

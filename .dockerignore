@@ -21,8 +21,7 @@ Dockerfile
 **/Dockerfile
 docker-compose.yml
 
-# Secrets stay out of image layers; runtime env comes from compose env_file,
-# build-time public values come from compose build args
+# Env files stay out of image layers and are supplied at runtime.
 **/.env
 **/.env.*
 !**/.env.example
@@ -30,3 +29,5 @@ docker-compose.yml
 local.db
 local.db-*
 .data
+
+/legacy-reference

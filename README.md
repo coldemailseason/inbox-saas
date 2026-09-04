@@ -29,23 +29,48 @@ pnpm install
 
 This project uses PostgreSQL with Drizzle ORM.
 
-1. Make sure you have a PostgreSQL database set up.
-2. Update your `apps/server/.env` file with your PostgreSQL connection details.
-
-3. Apply the schema to your database:
+Start the local Docker Postgres service:
 
 ```bash
-pnpm run db:push
+pnpm db:start
 ```
 
-Then, run the development server:
+Configure `apps/server/.env` from `apps/server/.env.example` with local development
+credentials. For every database change: update the schema, run `pnpm db:generate`,
+review the generated SQL, then run `pnpm db:migrate`. Generated migrations are
+committed to Git; schema push is not a project workflow. Compose runs a one-shot
+migration service before starting the server.
+
+Then run the development server:
 
 ```bash
-pnpm run dev
+pnpm dev
 ```
 
 Open [http://localhost:3001](http://localhost:3001) in your browser to see the web application.
-The API is running at [http://localhost:3000](http://localhost:3000).
+Vite and Nginx proxy the application API paths through the same origin.
+
+For a full-container smoke test, run `pnpm docker:up` and open
+[http://localhost:3002](http://localhost:3002). Vite always uses port `3001` and fails
+instead of choosing a different port when it is unavailable.
+
+## Integration Tests
+
+Integration tests require a separate PostgreSQL database. Create and migrate it once:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml exec -T postgres \
+  psql -U postgres -d postgres -c 'CREATE DATABASE "inbox-saas-test";'
+DATABASE_URL=postgresql://postgres:password@localhost:5432/inbox-saas-test \
+  pnpm --filter @inbox-saas/db run db:migrate
+```
+
+Run the database-backed suite only against that isolated database:
+
+```bash
+TEST_DATABASE_URL=postgresql://postgres:password@localhost:5432/inbox-saas-test \
+  pnpm test:integration
+```
 
 ## UI Customization
 
@@ -77,14 +102,44 @@ If you want to add app-specific blocks instead of shared primitives, run the sha
 
 ### Docker Compose
 
-- Target: web + server
-- Config: `docker-compose.yml` (app Dockerfiles live in `apps/*/Dockerfile`)
-- Build images: pnpm run docker:build
-- Start: pnpm run docker:up
-- Logs: pnpm run docker:logs
-- Stop: pnpm run docker:down
+- Local Docker uses `docker-compose.yml` with `docker-compose.dev.yml` through the root
+  `docker:*` and `db:*` scripts.
+- Build images: `pnpm docker:build`
+- Start: `pnpm docker:up`
+- Logs: `pnpm docker:logs`
+- Stop: `pnpm docker:down`
 
-Environment variables are read from each app's `.env` file (baked into web builds for public variables) and overridden in `docker-compose.yml` for container networking.
+Future production uses `docker-compose.yml` with `docker-compose.production.yml`. That
+overlay publishes only the web service; the deployment platform supplies the required
+runtime environment values, including the private database URL.
+
+### Native Provisioner Development
+
+The provisioner remains private in Compose and has no published host port. To develop its
+Microsoft browser flow locally, run it natively with a visible browser instead:
+
+```bash
+INBOX_PROVISIONER_HEADLESS_BROWSER=false \
+INBOX_PROVISIONER_SIGNING_SECRET="$INBOX_PROVISIONER_SIGNING_SECRET" \
+INBOX_PROVISIONER_TRANSPORT_ENCRYPTION_KEY="$INBOX_PROVISIONER_TRANSPORT_ENCRYPTION_KEY" \
+uv run --directory apps/provisioner uvicorn inbox_provisioner.main:app --host 127.0.0.1 --port 8000
+```
+
+Run the real worker separately with `DATABASE_URL`,
+`TENANT_CREDENTIAL_ENCRYPTION_KEY`, `TENANT_CREDENTIAL_ENCRYPTION_KEY_VERSION`, and
+`INBOX_PROVISIONER_SIGNING_SECRET` configured in its environment, plus:
+
+```bash
+PROVISIONER_BASE_URL=http://127.0.0.1:8000 pnpm --filter worker dev
+```
+
+`INBOX_PROVISIONER_SIGNING_SECRET` must be the same base64-encoded random 32-byte value in
+both processes. Generate one with `openssl rand -base64 32`.
+`INBOX_PROVISIONER_TRANSPORT_ENCRYPTION_KEY` must be a separate shared base64-encoded random
+32-byte value. Generate it with `openssl rand -base64 32`.
+
+`apps/worker/.env.example` lists the complete real-worker environment. The fake runner is
+development-only and requires explicit `pnpm --filter worker dev:fake` invocation.
 
 For more details, see the guide on [Deploying with Docker Compose](https://www.better-t-stack.dev/docs/guides/docker).
 
@@ -113,9 +168,9 @@ inbox-saas/
 - `pnpm run dev:web`: Start only the web application
 - `pnpm run dev:server`: Start only the server
 - `pnpm run check-types`: Check TypeScript types across all apps
-- `pnpm run db:push`: Push schema changes to database
-- `pnpm run db:generate`: Generate database client/types
-- `pnpm run db:migrate`: Run database migrations
+- `pnpm test:integration`: Run database-backed tests against `TEST_DATABASE_URL`
+- `pnpm db:generate`: Generate a migration from the schema; review its SQL before commit
+- `pnpm db:migrate`: Run committed database migrations
 - `pnpm run db:studio`: Open database studio UI
 - `pnpm run check`: Run Oxlint and Oxfmt
 - `pnpm run docker:build`: Build the Docker Compose images

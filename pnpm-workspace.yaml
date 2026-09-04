@@ -20,6 +20,7 @@ catalog:
   react: ^19.2.8
   react-dom: ^19.2.8
   sonner: ^2.0.7
+  vitest: ^4.1.6
   "@orpc/client": ^1.14.12
   "@polar-sh/better-auth": ^1.8.4
   "@types/react": ^19.2.17
