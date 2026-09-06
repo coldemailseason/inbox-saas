@@ -43,6 +43,31 @@ const publicJobFields = [
   "updatedAt",
 ];
 
+type PublicTenantValidationJob = {
+  id: string;
+  operation: "tenant_validation";
+  status: "processing" | "completed" | "failed";
+  failureCode: string | null;
+  retryable: boolean | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type PublicTenantConnection = {
+  id: string;
+  organizationId: string;
+  workspaceId: string;
+  state: "validating" | "active" | "validation_failed" | "detached";
+  microsoftTenantId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type TenantValidationResponse = {
+  job: PublicTenantValidationJob;
+  tenantConnection: PublicTenantConnection;
+};
+
 let userId: string;
 let organizationOneId: string;
 let organizationTwoId: string;
@@ -101,6 +126,11 @@ function requestValidation(
     },
     body: JSON.stringify({ credentials: body }),
   });
+}
+
+async function readTenantValidationResponse(response: Response): Promise<TenantValidationResponse> {
+  // SAFETY: The tenant-validation endpoints return the fixed public response shape modeled above.
+  return (await response.json()) as TenantValidationResponse;
 }
 
 beforeEach(async () => {
@@ -225,6 +255,38 @@ describe("tenant validation v1 API", () => {
     }
   });
 
+  it("tolerates extra request fields", async () => {
+    const response = await app.request(`/api/v1/workspaces/${workspaceOneId}/tenant-connections`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${workspaceOneWriteToken}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": "extra-fields",
+      },
+      body: JSON.stringify({
+        credentials: { ...credentials, ignoredNestedField: true },
+        ignoredTopLevelField: true,
+      }),
+    });
+
+    expect(response.status).toBe(202);
+  });
+
+  it("rejects whitespace-padded email addresses", async () => {
+    const response = await requestValidation(
+      workspaceOneId,
+      workspaceOneWriteToken,
+      "padded-email",
+      {
+        ...credentials,
+        email: ` ${credentials.email} `,
+      },
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ code: "invalid_request" });
+  });
+
   it("accepts only Bearer authority even when a browser session is present", async () => {
     const sessionOnly = await app.request(
       `/api/v1/workspaces/${workspaceOneId}/tenant-connections`,
@@ -278,7 +340,7 @@ describe("tenant validation v1 API", () => {
 
   it("returns safe accepted resources, persists no credential values, and reuses idempotency keys", async () => {
     const first = await requestValidation(workspaceOneId, workspaceOneWriteToken, "same-key");
-    const firstBody = await first.json();
+    const firstBody = await readTenantValidationResponse(first);
     const repeated = await requestValidation(workspaceOneId, workspaceOneWriteToken, "same-key");
     const repeatedBody = await repeated.json();
     const organizationWide = await requestValidation(
@@ -303,7 +365,7 @@ describe("tenant validation v1 API", () => {
       job: { status: "processing" },
     });
     expect(repeatedBody).toMatchObject({
-      job: { id: (firstBody as { job: { id: string } }).job.id },
+      job: { id: firstBody.job.id },
     });
     expect(JSON.stringify(firstBody)).not.toContain(credentials.email);
     expect(JSON.stringify(firstBody)).not.toContain(credentials.password);
@@ -312,29 +374,19 @@ describe("tenant validation v1 API", () => {
     const [storedTenant] = await database
       .select()
       .from(tenantConnection)
-      .where(
-        eq(
-          tenantConnection.id,
-          (firstBody as { tenantConnection: { id: string } }).tenantConnection.id,
-        ),
-      );
+      .where(eq(tenantConnection.id, firstBody.tenantConnection.id));
     const storedJob = await database
       .select()
       .from(job)
-      .where(
-        eq(
-          job.tenantConnectionId,
-          (firstBody as { tenantConnection: { id: string } }).tenantConnection.id,
-        ),
-      );
+      .where(eq(job.tenantConnectionId, firstBody.tenantConnection.id));
     const storedIdempotency = await database
       .select()
       .from(idempotencyRecord)
-      .where(eq(idempotencyRecord.jobId, (firstBody as { job: { id: string } }).job.id));
+      .where(eq(idempotencyRecord.jobId, firstBody.job.id));
     const storedOutbox = await database
       .select()
       .from(outboxEvent)
-      .where(eq(outboxEvent.jobId, (firstBody as { job: { id: string } }).job.id));
+      .where(eq(outboxEvent.jobId, firstBody.job.id));
     const persisted = JSON.stringify([storedTenant, storedJob, storedIdempotency, storedOutbox]);
     expect(persisted).not.toContain(credentials.email);
     expect(persisted).not.toContain(credentials.password);
@@ -351,7 +403,7 @@ describe("tenant validation v1 API", () => {
 
   it("returns jobs only to workspace-readable keys and never exposes encryption fields", async () => {
     const created = await requestValidation(workspaceOneId, workspaceOneWriteToken, "job-read");
-    const createdBody = (await created.json()) as { job: { id: string } };
+    const createdBody = await readTenantValidationResponse(created);
     const responses = await Promise.all([
       app.request(`/api/v1/jobs/${createdBody.job.id}`, {
         headers: { Authorization: `Bearer ${workspaceOneReadToken}` },
@@ -381,7 +433,7 @@ describe("tenant validation v1 API", () => {
 
   it("projects internal job states to safe public job statuses", async () => {
     const created = await requestValidation(workspaceOneId, workspaceOneWriteToken, "job-status");
-    const createdBody = (await created.json()) as { job: { id: string; status: string } };
+    const createdBody = await readTenantValidationResponse(created);
     const jobId = createdBody.job.id;
 
     expect(created.status).toBe(202);
@@ -399,7 +451,7 @@ describe("tenant validation v1 API", () => {
     const running = await app.request(`/api/v1/jobs/${jobId}`, {
       headers: { Authorization: `Bearer ${workspaceOneReadToken}` },
     });
-    const runningBody = (await running.json()) as { job: Record<string, unknown> };
+    const runningBody = await readTenantValidationResponse(running);
 
     expect(running.status).toBe(200);
     expect(runningBody.job.status).toBe("processing");
@@ -411,7 +463,7 @@ describe("tenant validation v1 API", () => {
     const completed = await app.request(`/api/v1/jobs/${jobId}`, {
       headers: { Authorization: `Bearer ${workspaceOneReadToken}` },
     });
-    const completedBody = (await completed.json()) as { job: Record<string, unknown> };
+    const completedBody = await readTenantValidationResponse(completed);
 
     expect(completed.status).toBe(200);
     expect(completedBody.job.status).toBe("completed");
@@ -423,7 +475,7 @@ describe("tenant validation v1 API", () => {
     const failed = await app.request(`/api/v1/jobs/${jobId}`, {
       headers: { Authorization: `Bearer ${workspaceOneReadToken}` },
     });
-    const failedBody = (await failed.json()) as { job: Record<string, unknown> };
+    const failedBody = await readTenantValidationResponse(failed);
 
     expect(failed.status).toBe(200);
     expect(failedBody.job).toMatchObject({
@@ -432,7 +484,16 @@ describe("tenant validation v1 API", () => {
       status: "failed",
     });
 
-    for (const body of [createdBody, runningBody, completedBody, failedBody]) {
+    await database.update(job).set({ state: "cancelled" }).where(eq(job.id, jobId));
+    const cancelled = await app.request(`/api/v1/jobs/${jobId}`, {
+      headers: { Authorization: `Bearer ${workspaceOneReadToken}` },
+    });
+    const cancelledBody = await readTenantValidationResponse(cancelled);
+
+    expect(cancelled.status).toBe(200);
+    expect(cancelledBody.job.status).toBe("failed");
+
+    for (const body of [createdBody, runningBody, completedBody, failedBody, cancelledBody]) {
       expect(Object.keys(body.job).sort()).toEqual(publicJobFields);
       expect(JSON.stringify(body)).not.toContain("leaseToken");
       expect(JSON.stringify(body)).not.toContain("leaseExpiresAt");

@@ -47,55 +47,19 @@ function parseProvisionerBaseUrl(value: string): string {
   }
 }
 
-function parseCredentialKey(encodedKey: string): Buffer {
+function parseBase64Key(encodedValue: string, errorMessage: string): Buffer {
   try {
-    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encodedKey)) {
-      throw new Error("Tenant credential encryption key is not base64");
+    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encodedValue)) {
+      throw new Error("Value is not base64");
     }
 
-    const credentialKey = Buffer.from(encodedKey, "base64");
-    if (credentialKey.byteLength !== 32) {
-      throw new Error("Tenant credential encryption key is not 32 bytes");
+    const key = Buffer.from(encodedValue, "base64");
+    if (key.byteLength !== 32) {
+      throw new Error("Value is not 32 bytes");
     }
-    return credentialKey;
+    return key;
   } catch {
-    throw new Error(
-      "TENANT_CREDENTIAL_ENCRYPTION_KEY must be a base64-encoded 32-byte key and TENANT_CREDENTIAL_ENCRYPTION_KEY_VERSION must be non-empty",
-    );
-  }
-}
-
-function parseProvisionerSigningSecret(encodedSecret: string): Buffer {
-  try {
-    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encodedSecret)) {
-      throw new Error("Provisioner signing secret is not base64");
-    }
-
-    const signingSecret = Buffer.from(encodedSecret, "base64");
-    if (signingSecret.byteLength !== 32) {
-      throw new Error("Provisioner signing secret is not 32 bytes");
-    }
-    return signingSecret;
-  } catch {
-    throw new Error("INBOX_PROVISIONER_SIGNING_SECRET must be a base64-encoded 32-byte key");
-  }
-}
-
-function parseProvisionerTransportEncryptionKey(encodedKey: string): Buffer {
-  try {
-    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encodedKey)) {
-      throw new Error("Provisioner transport encryption key is not base64");
-    }
-
-    const transportEncryptionKey = Buffer.from(encodedKey, "base64");
-    if (transportEncryptionKey.byteLength !== 32) {
-      throw new Error("Provisioner transport encryption key is not 32 bytes");
-    }
-    return transportEncryptionKey;
-  } catch {
-    throw new Error(
-      "INBOX_PROVISIONER_TRANSPORT_ENCRYPTION_KEY must be a base64-encoded 32-byte key",
-    );
+    throw new Error(errorMessage);
   }
 }
 
@@ -111,13 +75,18 @@ export function parseTenantValidationWorkerConfig(
   const provisionerBaseUrl = parseProvisionerBaseUrl(
     requiredValue(environment, "PROVISIONER_BASE_URL"),
   );
-  const provisionerSigningSecret = parseProvisionerSigningSecret(
+  const provisionerSigningSecret = parseBase64Key(
     requiredValue(environment, "INBOX_PROVISIONER_SIGNING_SECRET"),
+    "INBOX_PROVISIONER_SIGNING_SECRET must be a base64-encoded 32-byte key",
   );
-  const provisionerTransportEncryptionKey = parseProvisionerTransportEncryptionKey(
+  const provisionerTransportEncryptionKey = parseBase64Key(
     requiredValue(environment, "INBOX_PROVISIONER_TRANSPORT_ENCRYPTION_KEY"),
+    "INBOX_PROVISIONER_TRANSPORT_ENCRYPTION_KEY must be a base64-encoded 32-byte key",
   );
-  const credentialKey = parseCredentialKey(encodedKey);
+  const credentialKey = parseBase64Key(
+    encodedKey,
+    "TENANT_CREDENTIAL_ENCRYPTION_KEY must be a base64-encoded 32-byte key and TENANT_CREDENTIAL_ENCRYPTION_KEY_VERSION must be non-empty",
+  );
 
   return {
     databaseUrl,
@@ -148,6 +117,9 @@ export function parseFakeTenantValidationWorkerConfig(
   );
   const microsoftTenantId = requiredValue(environment, "FAKE_MICROSOFT_TENANT_ID");
 
-  const credentialKey = parseCredentialKey(encodedKey);
+  const credentialKey = parseBase64Key(
+    encodedKey,
+    "TENANT_CREDENTIAL_ENCRYPTION_KEY must be a base64-encoded 32-byte key and TENANT_CREDENTIAL_ENCRYPTION_KEY_VERSION must be non-empty",
+  );
   return { databaseUrl, credentialKey, credentialKeyVersion, microsoftTenantId };
 }

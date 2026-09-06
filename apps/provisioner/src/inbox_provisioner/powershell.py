@@ -65,7 +65,7 @@ Connect-MgGraph -Scopes @(
     'Domain.ReadWrite.All',
     'Policy.Read.All',
     'Policy.ReadWrite.ConditionalAccess'
-) -UseDeviceAuthentication -NoWelcome -ErrorAction Stop
+) -UseDeviceAuthentication -ContextScope Process -NoWelcome -ErrorAction Stop
 """
     _EXCHANGE_DEVICE_CODE_COMMAND = """
 Connect-ExchangeOnline -Device -ShowBanner:$false -ErrorAction Stop

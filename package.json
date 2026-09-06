@@ -35,13 +35,13 @@
   },
   "devDependencies": {
     "@inbox-saas/config": "workspace:*",
+    "@oxlint/plugins": "1.80.0",
     "@types/node": "catalog:",
     "lefthook": "^2.1.10",
     "oxfmt": "^0.63.0",
     "oxlint": "^1.78.0",
     "turbo": "^2.10.7",
-    "typescript": "catalog:",
-    "vitest": "catalog:"
+    "typescript": "catalog:"
   },
   "packageManager": "pnpm@11.5.2"
 }

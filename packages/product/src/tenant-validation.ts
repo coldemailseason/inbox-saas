@@ -106,16 +106,22 @@ async function getJobWithTenant(database: Database, jobId: string) {
   return { connection, storedJob };
 }
 
-function isUniqueViolation(error: unknown): boolean {
+type DatabaseErrorCause = {
+  readonly code?: string;
+  readonly cause?: unknown;
+};
+
+function parseDatabaseErrorCause(cause: unknown): DatabaseErrorCause | undefined {
+  return cause !== null && Object(cause) === cause ? cause : undefined;
+}
+
+function isUniqueViolation(error: DatabaseErrorCause | undefined): boolean {
   let current = error;
-  while (typeof current === "object" && current !== null) {
-    if ("code" in current && (current as { code?: unknown }).code === "23505") {
+  while (current) {
+    if (current.code === "23505") {
       return true;
     }
-    if (!("cause" in current)) {
-      return false;
-    }
-    current = (current as { cause?: unknown }).cause;
+    current = parseDatabaseErrorCause(current.cause);
   }
   return false;
 }
@@ -251,7 +257,7 @@ export async function startTenantValidation(
       };
     });
   } catch (error) {
-    if (!isUniqueViolation(error)) {
+    if (!isUniqueViolation(parseDatabaseErrorCause(error))) {
       throw error;
     }
 
@@ -533,7 +539,7 @@ export async function applyTenantValidationResult(
       } as const;
     });
   } catch (error) {
-    if (!isUniqueViolation(error) || result.status !== "success") {
+    if (!isUniqueViolation(parseDatabaseErrorCause(error)) || result.status !== "success") {
       throw error;
     }
 

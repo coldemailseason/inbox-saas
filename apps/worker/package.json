@@ -19,7 +19,8 @@
     "@inbox-saas/provisioner-contract": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "evlog": "^2.22.4",
-    "pg-boss": "^12.29.0"
+    "pg-boss": "^12.29.0",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@inbox-saas/config": "workspace:*",

@@ -131,6 +131,7 @@ def test_success_retains_and_reuses_verified_session() -> None:
 
 def test_powershell_uses_only_the_fixed_graph_and_exchange_commands() -> None:
     graph_command = SubprocessTenantPowerShellProcess._GRAPH_DEVICE_CODE_COMMAND
+    assert "-ContextScope Process" in graph_command
     assert "User.ReadWrite.All" in graph_command
     assert "Directory.AccessAsUser.All" in graph_command
     assert "Domain.ReadWrite.All" in graph_command
@@ -145,6 +146,26 @@ def test_powershell_uses_only_the_fixed_graph_and_exchange_commands() -> None:
         )
         == "ABCD1234"
     )
+
+
+def test_cancelled_authentication_stops_process() -> None:
+    async def scenario() -> None:
+        process = FakeProcess()
+        service = RealTenantValidationService(
+            headless_browser=True,
+            completer=FakeCompleter(),
+            process_factory=FakeFactory([process]),
+        )
+        task = asyncio.create_task(service._authenticate("connection-1", request().credentials))
+
+        await asyncio.sleep(0)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        assert process.stopped
+
+    asyncio.run(scenario())
 
 
 def test_powershell_health_check_times_out_when_completion_marker_is_missing(monkeypatch) -> None:

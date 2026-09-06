@@ -9,6 +9,7 @@ import {
   type TenantValidationJobDto,
 } from "@inbox-saas/product";
 import { type Context, Hono } from "hono";
+import { z } from "zod";
 
 type V1Env = {
   Variables: {
@@ -29,29 +30,26 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
-function isTenantValidationRequest(value: unknown): value is {
-  credentials: { email: string; password: string };
-} {
-  if (typeof value !== "object" || value === null || !("credentials" in value)) {
-    return false;
-  }
+const tenantValidationRequestSchema = z.object({
+  credentials: z.object({
+    email: z
+      .string()
+      .refine((email) => email.trim().length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)),
+    password: z.string().min(1),
+  }),
+});
 
-  const { credentials } = value as { credentials?: unknown };
-  if (typeof credentials !== "object" || credentials === null) {
-    return false;
-  }
+type PublicTenantValidationJob = {
+  id: TenantValidationJobDto["id"];
+  operation: TenantValidationJobDto["operation"];
+  status: "processing" | "completed" | "failed";
+  failureCode: TenantValidationJobDto["failureCode"];
+  retryable: TenantValidationJobDto["retryable"];
+  createdAt: TenantValidationJobDto["createdAt"];
+  updatedAt: TenantValidationJobDto["updatedAt"];
+};
 
-  const { email, password } = credentials as { email?: unknown; password?: unknown };
-  return (
-    typeof email === "string" &&
-    email.trim().length > 0 &&
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) &&
-    typeof password === "string" &&
-    password.length > 0
-  );
-}
-
-function toPublicTenantValidationJob(job: TenantValidationJobDto) {
+function toPublicTenantValidationJob(job: TenantValidationJobDto): PublicTenantValidationJob {
   let status: "processing" | "completed" | "failed";
   switch (job.state) {
     case "queued":
@@ -62,6 +60,9 @@ function toPublicTenantValidationJob(job: TenantValidationJobDto) {
       status = "completed";
       break;
     case "failed":
+      status = "failed";
+      break;
+    case "cancelled":
       status = "failed";
       break;
     default:
@@ -124,7 +125,8 @@ export function createV1App(database: Database, cipher: TenantCredentialCipher) 
     } catch {
       return invalidRequest(c);
     }
-    if (!isTenantValidationRequest(body)) {
+    const parsedBody = tenantValidationRequestSchema.safeParse(body);
+    if (!parsedBody.success) {
       return invalidRequest(c);
     }
 
@@ -132,7 +134,7 @@ export function createV1App(database: Database, cipher: TenantCredentialCipher) 
       database,
       [c.var.grant],
       {
-        credentials: body.credentials,
+        credentials: parsedBody.data.credentials,
         idempotencyKey,
         workspaceId,
       },

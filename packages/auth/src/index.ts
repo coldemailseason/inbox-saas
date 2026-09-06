@@ -4,6 +4,7 @@ import { env } from "@inbox-saas/env/server";
 import { polar, checkout, portal } from "@polar-sh/better-auth";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { z } from "zod";
 
 import { polarClient } from "./lib/payments";
 
@@ -32,16 +33,18 @@ export function createAuth(db: Database = createDb()) {
       user: {
         create: {
           before: async (user) => {
-            const initialOrganizationName =
-              typeof user.initialOrganizationName === "string"
-                ? user.initialOrganizationName.trim()
-                : "";
+            const parsedOrganizationName = z
+              .string()
+              .trim()
+              .min(2)
+              .max(100)
+              .safeParse(user.initialOrganizationName);
 
-            if (initialOrganizationName.length < 2 || initialOrganizationName.length > 100) {
+            if (!parsedOrganizationName.success) {
               return false;
             }
 
-            return { data: { ...user, initialOrganizationName } };
+            return { data: { ...user, initialOrganizationName: parsedOrganizationName.data } };
           },
         },
       },

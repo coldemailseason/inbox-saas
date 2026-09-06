@@ -16,6 +16,7 @@ import {
 import { and, asc, eq, isNull, lte } from "drizzle-orm";
 import { log } from "evlog";
 import { PgBoss } from "pg-boss";
+import { z } from "zod";
 
 import { MicrosoftWorkLimiter, type ReleaseMicrosoftWorkPermit } from "./microsoft-work-limiter.js";
 
@@ -39,6 +40,7 @@ export type ProcessTenantValidationJobInput = {
 const leaseDurationMs = 60_000;
 const leaseRenewalIntervalMs = 20_000;
 export const tenantValidationWorkerTickIntervalMs = 5_000;
+const tenantValidationQueuePayloadSchema = z.object({ jobId: z.string() });
 
 export async function dispatchPendingTenantValidationOutboxEvents(
   database: Database,
@@ -206,21 +208,18 @@ function createPgBossQueue(boss: PgBoss): TenantValidationQueue {
       }
     },
     async register(handler) {
-      await boss.work<{ jobId: string }>(
-        tenantValidationQueueName,
-        { localConcurrency: 5 },
-        async (jobs) => {
-          await Promise.all(
-            jobs.map(async ({ data }) => {
-              if (!data || typeof data.jobId !== "string") {
-                log.error({ action: "tenant_validation_queue_payload_invalid" });
-                return;
-              }
-              await handler(data.jobId);
-            }),
-          );
-        },
-      );
+      await boss.work(tenantValidationQueueName, { localConcurrency: 5 }, async (jobs) => {
+        await Promise.all(
+          jobs.map(async ({ data }) => {
+            const payload = tenantValidationQueuePayloadSchema.safeParse(data);
+            if (!payload.success) {
+              log.error({ action: "tenant_validation_queue_payload_invalid" });
+              return;
+            }
+            await handler(payload.data.jobId);
+          }),
+        );
+      });
     },
   };
 }
@@ -232,7 +231,7 @@ export async function createTenantValidationWorker({
   credentialKeyVersion,
   provisioner,
   limiter = new MicrosoftWorkLimiter(),
-}: Omit<ProcessTenantValidationJobInput, "jobId" | "queue" | "now"> & { databaseUrl: string }) {
+}: Omit<ProcessTenantValidationJobInput, "jobId" | "now"> & { databaseUrl: string }) {
   const boss = await new PgBoss(databaseUrl).start();
   await boss.createQueue(tenantValidationQueueName, { retryLimit: 0 });
   const queue = createPgBossQueue(boss);

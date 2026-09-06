@@ -22,6 +22,8 @@ type CreateAppOptions = {
 
 export function createApp({ database, authInstance, credentialCipher }: CreateAppOptions) {
   const appRouter = createAppRouter(database);
+  // SAFETY: authInstance is constructed internally by createAuth; this cast only bridges the
+  // incompatible Better Auth SDK type boundary required by evlog and does not trust request input.
   const identifyUser = createAuthMiddleware(authInstance as BetterAuthInstance, {
     exclude: ["/api/auth/**", "/api/v1/**"],
     maskEmail: true,

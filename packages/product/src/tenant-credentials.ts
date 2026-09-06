@@ -1,4 +1,10 @@
 import { createCipheriv, createDecipheriv, createHmac, randomBytes } from "node:crypto";
+import { z } from "zod";
+
+const tenantCredentialsSchema = z.object({
+  email: z.string(),
+  password: z.string(),
+});
 
 export type TenantCredentials = {
   email: string;
@@ -83,7 +89,7 @@ export function createTenantCredentialCipher({
 }): TenantCredentialCipher {
   const cipherKey = validateKey(key);
 
-  if (!keyVersion) {
+  if (keyVersion.trim() === "") {
     throw new Error("Tenant credential cipher key version is required");
   }
 
@@ -107,17 +113,12 @@ export function createTenantCredentialCipher({
       decipher.setAAD(credentialAdditionalAuthenticatedData(context));
       decipher.setAuthTag(credentials.authTag);
       const plaintext = Buffer.concat([decipher.update(credentials.ciphertext), decipher.final()]);
-      const parsed: unknown = JSON.parse(plaintext.toString("utf8"));
-
-      if (typeof parsed !== "object" || parsed === null) {
-        throw new Error("Tenant credential ciphertext is invalid");
-      }
-      const { email, password } = parsed as Record<string, unknown>;
-      if (typeof email !== "string" || typeof password !== "string") {
+      const parsed = tenantCredentialsSchema.safeParse(JSON.parse(plaintext.toString("utf8")));
+      if (!parsed.success) {
         throw new Error("Tenant credential ciphertext is invalid");
       }
 
-      return { email, password };
+      return parsed.data;
     },
     fingerprint(input) {
       return fingerprintTenantValidationPayload(cipherKey, input);

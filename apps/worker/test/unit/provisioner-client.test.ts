@@ -53,11 +53,13 @@ describe("HttpTenantValidationProvisioner", () => {
     expect(fetch).toHaveBeenCalledOnce();
     const [, options] = fetch.mock.calls[0] ?? [];
     const body = options?.body;
-    expect(typeof body).toBe("string");
+    expect(body).toBeTypeOf("string");
+    // SAFETY: The preceding runtime matcher proves body is a string, but does not narrow BodyInit for TypeScript.
+    const serializedBody = body as string;
     expect(body).not.toContain(request.credentials.email);
     expect(body).not.toContain(request.credentials.password);
     expect(body).not.toContain(request.jobId);
-    expect(JSON.parse(body as string)).toEqual({
+    expect(JSON.parse(serializedBody)).toEqual({
       iv: expect.any(String),
       ciphertext: expect.any(String),
       authTag: expect.any(String),
@@ -74,10 +76,10 @@ describe("HttpTenantValidationProvisioner", () => {
             Buffer.alloc(32, 7),
             "1735689600",
             "test-nonce",
-            body as string,
+            serializedBody,
           ),
         },
-        body: body as string,
+        body: serializedBody,
         signal: expect.any(AbortSignal),
       },
     );

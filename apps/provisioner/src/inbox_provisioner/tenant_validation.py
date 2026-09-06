@@ -87,6 +87,7 @@ class RealTenantValidationService(TenantValidationService):
         self, connection_id: str, credentials: TenantCredentials
     ) -> AuthenticatedTenantSession:
         process = await self._process_factory()
+        session: AuthenticatedTenantSession | None = None
         try:
             async with asyncio.timeout(self._authentication_timeout_seconds):
                 async with self._browser_authentication:
@@ -95,14 +96,15 @@ class RealTenantValidationService(TenantValidationService):
                 health = await process.health_check()
                 if health.microsoft_tenant_id is None or health.user_principal_name is None:
                     raise TenantSessionAuthenticationError()
-                return AuthenticatedTenantSession(
+                session = AuthenticatedTenantSession(
                     process=process,
                     microsoft_tenant_id=health.microsoft_tenant_id,
                     user_principal_name=health.user_principal_name,
                 )
-        except Exception:
-            await process.stop()
-            raise
+                return session
+        finally:
+            if session is None:
+                await process.stop()
 
     @staticmethod
     def _failure(code: str, *, retryable: bool) -> TenantValidationFailure:

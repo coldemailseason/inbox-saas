@@ -5,7 +5,6 @@ from typing import Protocol
 from fastapi import FastAPI, Request, Response
 
 from .contracts import (
-    TenantValidationFailure,
     TenantValidationRequest,
     TenantValidationResult,
     tenant_validation_result_adapter,
@@ -20,24 +19,13 @@ class TenantValidationService(Protocol):
     async def validate(self, request: TenantValidationRequest) -> TenantValidationResult: ...
 
 
-class UnavailableTenantValidationService:
-    async def validate(self, request: TenantValidationRequest) -> TenantValidationResult:
-        return TenantValidationFailure(
-            contractVersion="v1",
-            status="failure",
-            code="unexpected_failure",
-            retryable=True,
-        )
-
-
 def create_app(
     *,
     signing_secret: bytes,
     transport_encryption_key: bytes,
-    service: TenantValidationService | None = None,
+    service: TenantValidationService,
     clock: Callable[[], datetime] | None = None,
     nonce_store: InMemoryNonceStore | None = None,
-    headless_browser: bool | None = None,
 ) -> FastAPI:
     if len(signing_secret) != 32:
         raise ValueError("signing_secret must be 32 bytes")
@@ -45,14 +33,6 @@ def create_app(
         raise ValueError("transport_encryption_key must be 32 bytes")
 
     app = FastAPI()
-    if service is not None:
-        validation_service = service
-    elif headless_browser is None:
-        validation_service = UnavailableTenantValidationService()
-    else:
-        from .tenant_validation import RealTenantValidationService
-
-        validation_service = RealTenantValidationService(headless_browser=headless_browser)
     request_clock = clock or (lambda: datetime.now(UTC))
     used_nonces = nonce_store or InMemoryNonceStore()
 
@@ -93,7 +73,7 @@ def create_app(
             return Response(status_code=400)
 
         try:
-            service_result = await validation_service.validate(tenant_request)
+            service_result = await service.validate(tenant_request)
             validated_result = tenant_validation_result_adapter.validate_python(service_result)
         except Exception:
             return Response(status_code=500)

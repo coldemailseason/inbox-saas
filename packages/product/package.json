@@ -18,7 +18,8 @@
   "dependencies": {
     "@inbox-saas/db": "workspace:*",
     "@inbox-saas/provisioner-contract": "workspace:*",
-    "drizzle-orm": "^0.45.2"
+    "drizzle-orm": "^0.45.2",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@inbox-saas/config": "workspace:*",

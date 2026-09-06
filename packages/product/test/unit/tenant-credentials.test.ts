@@ -35,6 +35,12 @@ describe("tenant credential cipher", () => {
     ).toThrow("exactly 32 bytes");
   });
 
+  it("rejects whitespace-only key versions", () => {
+    expect(() => createTenantCredentialCipher({ key, keyVersion: " \t\n" })).toThrow(
+      "Tenant credential cipher key version is required",
+    );
+  });
+
   it("rejects tampered encrypted binary data", () => {
     const cipher = createTenantCredentialCipher({ key, keyVersion: "test-v1" });
     const context = { operation: "tenant_validation" as const, workspaceId: "workspace-1" };
@@ -48,6 +54,21 @@ describe("tenant credential cipher", () => {
     encrypted.authTag[0] = (encrypted.authTag[0] ?? 0) ^ 1;
 
     expect(() => cipher.decrypt(encrypted, context)).toThrow();
+  });
+
+  it("rejects authenticated plaintext with an invalid credential shape", () => {
+    const cipher = createTenantCredentialCipher({ key, keyVersion: "test-v1" });
+    const context = { operation: "tenant_validation" as const, workspaceId: "workspace-1" };
+    const malformedCredentials = {
+      email: "tenant-admin@example.test",
+      password: "private-password",
+    };
+    Object.defineProperty(malformedCredentials, "password", { value: 42 });
+    const encrypted = cipher.encrypt(malformedCredentials, context);
+
+    expect(() => cipher.decrypt(encrypted, context)).toThrow(
+      "Tenant credential ciphertext is invalid",
+    );
   });
 
   it("rejects credentials encrypted for another workspace context", () => {

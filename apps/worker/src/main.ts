@@ -53,7 +53,7 @@ async function start(): Promise<void> {
   log.info({ action: "tenant_validation_worker_started", provisioner: "http" });
 }
 
-void start().catch((error: unknown) => {
+void start().catch((error) => {
   process.exitCode = 1;
   console.error(
     error instanceof Error ? error.message : "Tenant-validation worker failed to start",

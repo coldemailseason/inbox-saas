@@ -1,10 +1,13 @@
 import { createFileRoute, useSearch } from "@tanstack/react-router";
+import { z } from "zod";
+
+const successSearchSchema = z.object({
+  checkout_id: z.string().optional(),
+});
 
 export const Route = createFileRoute("/success")({
   component: SuccessPage,
-  validateSearch: (search) => ({
-    checkout_id: search.checkout_id as string,
-  }),
+  validateSearch: (search) => successSearchSchema.parse(search),
 });
 
 function SuccessPage() {

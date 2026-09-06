@@ -73,17 +73,21 @@ export async function issueApiKey(
     throw new Error("Failed to issue API key");
   }
 
+  const issued = {
+    creatorUserId: key.creatorUserId,
+    createdAt: key.createdAt,
+    expiresAt: key.expiresAt,
+    id: key.id,
+    organizationId: key.organizationId,
+    permission: key.permission,
+    prefix: key.prefix,
+    token,
+  };
+
   if (key.scope === "organization") {
     return {
-      creatorUserId: key.creatorUserId,
-      createdAt: key.createdAt,
-      expiresAt: key.expiresAt,
-      id: key.id,
-      organizationId: key.organizationId,
-      permission: key.permission,
-      prefix: key.prefix,
+      ...issued,
       scope: "organization",
-      token,
     };
   }
 
@@ -92,15 +96,8 @@ export async function issueApiKey(
   }
 
   return {
-    creatorUserId: key.creatorUserId,
-    createdAt: key.createdAt,
-    expiresAt: key.expiresAt,
-    id: key.id,
-    organizationId: key.organizationId,
-    permission: key.permission,
-    prefix: key.prefix,
+    ...issued,
     scope: "workspace",
-    token,
     workspaceId: key.workspaceId,
   };
 }

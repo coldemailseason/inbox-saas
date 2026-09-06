@@ -15,7 +15,7 @@ import type {
   TenantValidationResult,
 } from "@inbox-saas/provisioner-contract";
 import { eq, inArray } from "drizzle-orm";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FakeTenantValidationProvisioner } from "../../src/fake-provisioner.js";
 import { MicrosoftWorkLimiter } from "../../src/microsoft-work-limiter.js";
@@ -87,21 +87,6 @@ const successfulProvisioning: TenantValidationResult = {
   microsoftTenantId: "delayed-tenant",
   status: "success",
 };
-
-async function waitFor(assertion: () => void | Promise<void>, timeoutMs = 2_000): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (true) {
-    try {
-      await assertion();
-      return;
-    } catch (error) {
-      if (Date.now() >= deadline) {
-        throw error;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 10));
-    }
-  }
-}
 
 function grants() {
   return [
@@ -497,9 +482,15 @@ describe("tenant validation worker", () => {
       }),
     );
 
-    await waitFor(() => expect(provisioner.requests).toHaveLength(3));
+    await vi.waitFor(() => expect(provisioner.requests).toHaveLength(3), {
+      interval: 10,
+      timeout: 2_000,
+    });
     provisioner.releaseNext(successfulProvisioning);
-    await waitFor(() => expect(provisioner.requests).toHaveLength(4));
+    await vi.waitFor(() => expect(provisioner.requests).toHaveLength(4), {
+      interval: 10,
+      timeout: 2_000,
+    });
     while (provisioner.pendingCount > 0) {
       provisioner.releaseNext(successfulProvisioning);
       await new Promise((resolve) => setTimeout(resolve, 0));
@@ -529,9 +520,15 @@ describe("tenant validation worker", () => {
       }),
     );
 
-    await waitFor(() => expect(provisioner.requests).toHaveLength(5));
+    await vi.waitFor(() => expect(provisioner.requests).toHaveLength(5), {
+      interval: 10,
+      timeout: 2_000,
+    });
     provisioner.releaseNext(successfulProvisioning);
-    await waitFor(() => expect(provisioner.requests).toHaveLength(6));
+    await vi.waitFor(() => expect(provisioner.requests).toHaveLength(6), {
+      interval: 10,
+      timeout: 2_000,
+    });
     while (provisioner.pendingCount > 0) {
       provisioner.releaseNext(successfulProvisioning);
       await new Promise((resolve) => setTimeout(resolve, 0));
@@ -554,20 +551,35 @@ describe("tenant validation worker", () => {
       limiter,
       provisioner,
     });
-    await waitFor(async () => {
-      expect((await storedJob(started.job.id)).leaseExpiresAt).toBeInstanceOf(Date);
-    });
+    await vi.waitFor(
+      async () => {
+        expect((await storedJob(started.job.id)).leaseExpiresAt).toBeInstanceOf(Date);
+      },
+      {
+        interval: 10,
+        timeout: 2_000,
+      },
+    );
     const initialLease = (await storedJob(started.job.id)).leaseExpiresAt;
     if (!initialLease) {
       throw new Error("Expected claimed job lease");
     }
 
-    await waitFor(async () => {
-      const renewed = await storedJob(started.job.id);
-      expect(renewed.leaseExpiresAt?.getTime()).toBeGreaterThan(initialLease.getTime());
-    }, 25_000);
+    await vi.waitFor(
+      async () => {
+        const renewed = await storedJob(started.job.id);
+        expect(renewed.leaseExpiresAt?.getTime()).toBeGreaterThan(initialLease.getTime());
+      },
+      {
+        interval: 10,
+        timeout: 25_000,
+      },
+    );
     heldPermits[0]?.();
-    await waitFor(() => expect(provisioner.requests).toHaveLength(1));
+    await vi.waitFor(() => expect(provisioner.requests).toHaveLength(1), {
+      interval: 10,
+      timeout: 2_000,
+    });
     provisioner.releaseNext(successfulProvisioning);
     await processing;
     heldPermits.slice(1).forEach((release) => release());
@@ -589,9 +601,15 @@ describe("tenant validation worker", () => {
       provisioner,
     });
 
-    await waitFor(async () => {
-      expect((await storedJob(started.job.id)).leaseToken).toBeTruthy();
-    });
+    await vi.waitFor(
+      async () => {
+        expect((await storedJob(started.job.id)).leaseToken).toBeTruthy();
+      },
+      {
+        interval: 10,
+        timeout: 2_000,
+      },
+    );
     await database
       .update(job)
       .set({ leaseToken: crypto.randomUUID() })
@@ -621,7 +639,10 @@ describe("tenant validation worker", () => {
       }),
     );
 
-    await waitFor(() => expect(provisioner.requests).toHaveLength(3));
+    await vi.waitFor(() => expect(provisioner.requests).toHaveLength(3), {
+      interval: 10,
+      timeout: 2_000,
+    });
     const retryJobId = provisioner.requests[0]?.jobId;
     if (!retryJobId) {
       throw new Error("Expected provisioner request");
@@ -632,7 +653,10 @@ describe("tenant validation worker", () => {
       retryable: true,
       status: "failure",
     });
-    await waitFor(() => expect(provisioner.requests).toHaveLength(4));
+    await vi.waitFor(() => expect(provisioner.requests).toHaveLength(4), {
+      interval: 10,
+      timeout: 2_000,
+    });
     expect(await storedJob(retryJobId)).toMatchObject({ retryable: true, state: "queued" });
     while (provisioner.pendingCount > 0) {
       provisioner.releaseNext(successfulProvisioning);
@@ -659,9 +683,15 @@ describe("tenant validation worker", () => {
       const started = await startValidation("pg-boss-lifecycle");
       await worker.dispatchPendingOutbox();
 
-      await waitFor(async () => {
-        expect(await storedJob(started.job.id)).toMatchObject({ state: "completed" });
-      }, 10_000);
+      await vi.waitFor(
+        async () => {
+          expect(await storedJob(started.job.id)).toMatchObject({ state: "completed" });
+        },
+        {
+          interval: 10,
+          timeout: 10_000,
+        },
+      );
 
       const [completedConnection] = await database
         .select()

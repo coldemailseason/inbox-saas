@@ -13,7 +13,7 @@ const database = createDb(testDatabaseUrl);
 const auth = createAuth(database);
 const createdEmails: string[] = [];
 
-async function signUp(email: string, initialOrganizationName: string) {
+async function signUp(email: string, initialOrganizationName: string | number) {
   createdEmails.push(email);
 
   return auth.handler(
@@ -96,6 +96,16 @@ describe("email signup", () => {
         workspaceId: null,
       }),
     ]);
+  });
+
+  it("rejects invalid initial organization names", async () => {
+    for (const initialOrganizationName of [123, "x", "x".repeat(101)]) {
+      const email = `invalid-signup-${crypto.randomUUID()}@example.test`;
+      const response = await signUp(email, initialOrganizationName);
+
+      expect(response.ok).toBe(false);
+      expect(await database.select().from(user).where(eq(user.email, email))).toEqual([]);
+    }
   });
 
   it("does not create an account when the initial control plane cannot be created", async () => {
